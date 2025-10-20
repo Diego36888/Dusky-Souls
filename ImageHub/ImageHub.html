@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>校园图片分享 — 原型</title>
+  <style>
+    :root{--accent:#2b7a78;--muted:#666;--card:#fff;--bg:#f3f6f7}
+    body{font-family:system-ui,-apple-system,Segoe UI,Heiti TC,Arial; margin:0;background:var(--bg);color:#222}
+    header{background:linear-gradient(180deg,#fff, #eef5f5);padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+    h1{font-size:18px;margin:0;color:var(--accent)}
+    .container{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px;max-width:1200px;margin:18px auto}
+
+    /* 左侧：地图 + 照片 */
+    .map-card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .map-wrap{position:relative;border-radius:8px;overflow:hidden;border:1px solid #e5eef0}
+    .campus-map{display:block;max-width:100%;height:auto}
+    .hotspot{position:absolute;background:var(--accent);color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 12px rgba(43,122,120,.18);border:2px solid #fff}
+    .hotspot:hover{transform:translateY(-4px)}
+
+    .controls{display:flex;gap:8px;align-items:center;padding:10px 0}
+    input[type=date]{padding:6px;border-radius:6px;border:1px solid #d7e4e4}
+    .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px}
+    .photo-card{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 6px 12px rgba(0,0,0,.04);display:flex;flex-direction:column}
+    .photo-card img{width:100%;height:110px;object-fit:cover}
+    .photo-meta{font-size:12px;padding:8px;color:var(--muted)}
+
+    /* 侧栏 */
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn.secondary{background:#eee;color:#333}
+
+    /* small screens */
+    @media (max-width:880px){.container{grid-template-columns:1fr;padding:12px}.sidebar{order:2}}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect rx='8' width='36' height='36' fill='%232b7a78'/><text x='50%' y='54%' font-size='18' font-family='Arial' fill='white' text-anchor='middle'>校</text></svg>" alt="logo" width="36" height="36">
+    <h1>校园图片分享 - 原型</h1>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div id="currentUserLabel" style="color:var(--muted);font-size:13px">未登录</div>
+      <button class="btn" id="openLoginBtn">登录 / 注册</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="map-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>校园地图</strong>
+        <div style="font-size:13px;color:var(--muted)">点击地图上的点查看该地点照片</div>
+      </div>
+
+      <div class="map-wrap">
+        <!-- 下面放一张示意地图：实际使用时替换为真实地图图片 -->
+        <img src="MAP.png" alt="校园地图示意" class="campus-map" id="campusMap">
+
+        <!-- 热点示例（位置用百分比） -->
+        <button class="hotspot" style="left:40%;top:54%" data-place-id="library" title="图书馆">图</button>
+        <button class="hotspot" style="left:60%;top:20%" data-place-id="cafeteria" title="食堂">食</button>
+        <button class="hotspot" style="left:75%;top:54%" data-place-id="gym" title="体育馆">体</button>
+      </div>
+
+      <div class="controls" style="margin-top:12px">
+        <label>开始: <input type="date" id="dateFrom"></label>
+        <label>结束: <input type="date" id="dateTo"></label>
+        <button class="btn secondary" id="clearFilterBtn">清除筛选</button>
+      </div>
+
+      <div id="photosArea" aria-live="polite">
+        <div class="photo-grid" id="photoGrid"></div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="card">
+        <strong>上传照片（需登录）</strong>
+        <form id="uploadForm" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <label>地点
+            <select id="uploadPlace">
+              <option value="library">图书馆</option>
+              <option value="cafeteria">食堂</option>
+              <option value="gym">体育馆</option>
+            </select>
+          </label>
+          <label>拍摄时间 <input type="datetime-local" id="uploadTime"></label>
+          <label>选择图片 <input type="file" id="uploadFile" accept="image/*" required></label>
+          <textarea id="uploadDesc" rows="2" placeholder="可选：描述（不超过200字）"></textarea>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="uploadBtn" type="button">上传</button>
+            <button class="btn secondary" id="downloadDataBtn" type="button">导出数据</button>
+          </div>
+        </form>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">注意：此原型将数据保存在浏览器 localStorage，仅用于演示。生产环境请使用后端存储。</div>
+      </div>
+
+      <div class="card">
+        <strong>说明与操作</strong>
+        <ul style="padding-left:18px;color:var(--muted);font-size:13px;margin:8px 0">
+          <li>点击地图上的圆点查看该地点所有用户上传的照片。</li>
+          <li>使用时间筛选（开始/结束日期）来筛选照片。</li>
+          <li>注册并登录后可上传照片；照片以 base64 存储在 localStorage。</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 登录/注册模态 -->
+  <div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);align-items:center;justify-content:center;padding:20px">
+    <div style="background:white;padding:16px;border-radius:10px;min-width:320px;max-width:420px">
+      <h3 id="authTitle">登录 / 注册</h3>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn" id="showLogin">登录</button>
+        <button class="btn secondary" id="showRegister">注册</button>
+        <button style="margin-left:auto;background:#eee;border-radius:8px;padding:6px 8px;border:none;cursor:pointer" id="closeAuth">关闭</button>
+      </div>
+      <div id="authForms">
+        <div id="loginForm">
+          <label>用户名 <input id="loginUser" type="text"></label>
+          <label>密码 <input id="loginPass" type="password"></label>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="btn" id="doLogin">登录</button>
+            <button class="btn secondary" id="logoutBtn" style="display:none">登出</button>
+          </div>
+        </div>
+        <div id="registerForm" style="display:none;margin-top:8px">
+          <label>用户名 <input id="regUser" type="text"></label>
+          <label>密码 <input id="regPass" type="password"></label>
+          <label>确认密码 <input id="regPass2" type="password"></label>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="btn" id="doRegister">创建账号</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ------------ 简单数据层（localStorage） ------------- */
+    const LS_USERS = 'camp_users_v1';
+    const LS_PHOTOS = 'camp_photos_v1';
+    const LS_CURRENT = 'camp_current_v1';
+
+    function loadUsers(){return JSON.parse(localStorage.getItem(LS_USERS)||'[]')}
+    function saveUsers(u){localStorage.setItem(LS_USERS,JSON.stringify(u))}
+    function loadPhotos(){return JSON.parse(localStorage.getItem(LS_PHOTOS)||'[]')}
+    function savePhotos(p){localStorage.setItem(LS_PHOTOS,JSON.stringify(p))}
+    function setCurrent(username){localStorage.setItem(LS_CURRENT,username||'')}
+    function getCurrent(){return localStorage.getItem(LS_CURRENT)||''}
+
+    /* ------------ 密码哈希（使用 SubtleCrypto） ------------- */
+    async function hashPassword(pw){
+      const enc = new TextEncoder().encode(pw);
+      const hash = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    /* ------------ UI references ------------- */
+    const hotspots = document.querySelectorAll('.hotspot');
+    const photoGrid = document.getElementById('photoGrid');
+    const dateFromEl = document.getElementById('dateFrom');
+    const dateToEl = document.getElementById('dateTo');
+    const clearFilterBtn = document.getElementById('clearFilterBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadFile = document.getElementById('uploadFile');
+    const uploadPlace = document.getElementById('uploadPlace');
+    const uploadTime = document.getElementById('uploadTime');
+    const uploadDesc = document.getElementById('uploadDesc');
+    const currentUserLabel = document.getElementById('currentUserLabel');
+    const openLoginBtn = document.getElementById('openLoginBtn');
+    const authModal = document.getElementById('authModal');
+    const showLogin = document.getElementById('showLogin');
+    const showRegister = document.getElementById('showRegister');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const closeAuth = document.getElementById('closeAuth');
+
+    /* auth controls */
+    const doRegister = document.getElementById('doRegister');
+    const doLogin = document.getElementById('doLogin');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    /* init */
+    function refreshUserUI(){
+      const u = getCurrent();
+      if(u){currentUserLabel.textContent = `已登录：${u}`; openLoginBtn.textContent='切换账号/退出'}
+      else{currentUserLabel.textContent = '未登录'; openLoginBtn.textContent='登录 / 注册'}
+    }
+    refreshUserUI();
+
+    /* 点击热点 -> 显示该地点照片 */
+    hotspots.forEach(h=>h.addEventListener('click', ()=>{
+      const placeId = h.dataset.placeId;
+      loadAndShowPhotos(placeId);
+    }));
+
+    function parseDateInput(v){ if(!v) return null; return new Date(v); }
+
+    function loadAndShowPhotos(placeId){
+      const photos = loadPhotos().filter(p=>p.place===placeId);
+      const from = parseDateInput(dateFromEl.value);
+      const to = parseDateInput(dateToEl.value);
+      let filtered = photos.filter(p=>{
+        const d = new Date(p.time);
+        if(from && d < from) return false;
+        if(to && d > to) return false;
+        return true;
+      });
+      // 按时间倒序
+      filtered.sort((a,b)=>new Date(b.time) - new Date(a.time));
+
+      photoGrid.innerHTML = filtered.length? filtered.map(p=>`
+        <div class="photo-card">
+          <img src="${p.data}" alt="${escapeHtml(p.desc||'图片')}">
+          <div class="photo-meta">用户：${escapeHtml(p.user)} · 地点：${escapeHtml(p.place)} · 时间：${new Date(p.time).toLocaleString()}</div>
+        </div>
+      `).join('') : `<div style="color:${'#999'};padding:12px">此地点暂无符合条件的照片。</div>`;
+    }
+
+    clearFilterBtn.addEventListener('click', ()=>{dateFromEl.value='';dateToEl.value='';photoGrid.innerHTML='';});
+
+    /* 上传流程 */
+    uploadBtn.addEventListener('click', async ()=>{
+      const current = getCurrent();
+      if(!current){alert('请先登录再上传照片。'); authModal.style.display='flex'; return}
+      const file = uploadFile.files[0];
+      if(!file){alert('请选择图片'); return}
+      const place = uploadPlace.value;
+      const time = uploadTime.value ? new Date(uploadTime.value).toISOString() : new Date().toISOString();
+      const desc = uploadDesc.value || '';
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const dataUrl = e.target.result;
+        const photos = loadPhotos();
+        photos.push({id:Date.now().toString(36),user:current,place,time,desc,data:dataUrl});
+        savePhotos(photos);
+        alert('上传成功（保存在本地浏览器）');
+        // 如果当前视图是该地点则刷新
+        const visiblePlace = document.querySelector('.hotspot[aria-pressed]')?.dataset.placeId;
+        loadAndShowPhotos(place);
+        uploadFile.value=''; uploadDesc.value=''; uploadTime.value='';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 导出数据（JSON）
+    document.getElementById('downloadDataBtn').addEventListener('click', ()=>{
+      const payload = {users: loadUsers(), photos: loadPhotos()};
+      const blob = new Blob([JSON.stringify(payload, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download = 'campus-data.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    /* --------------- 登录 / 注册 --------------- */
+    openLoginBtn.addEventListener('click', ()=>{authModal.style.display='flex'});
+    closeAuth.addEventListener('click', ()=>{authModal.style.display='none'});
+    showLogin.addEventListener('click', ()=>{loginForm.style.display='block';registerForm.style.display='none';document.getElementById('authTitle').textContent='登录'});
+    showRegister.addEventListener('click', ()=>{loginForm.style.display='none';registerForm.style.display='block';document.getElementById('authTitle').textContent='注册'});
+
+    doRegister.addEventListener('click', async ()=>{
+      const user = document.getElementById('regUser').value.trim();
+      const pw = document.getElementById('regPass').value;
+      const pw2 = document.getElementById('regPass2').value;
+      if(!user || !pw){alert('用户名和密码不能为空');return}
+      if(pw!==pw2){alert('两次密码不一致');return}
+      const users = loadUsers();
+      if(users.find(u=>u.user===user)){alert('此用户名已存在');return}
+      const hp = await hashPassword(pw);
+      users.push({user,hash:hp,created:new Date().toISOString()});
+      saveUsers(users); setCurrent(user); refreshUserUI(); alert('注册成功并已登录'); authModal.style.display='none';
+    });
+
+    doLogin.addEventListener('click', async ()=>{
+      const user = document.getElementById('loginUser').value.trim();
+      const pw = document.getElementById('loginPass').value;
+      const users = loadUsers();
+      const target = users.find(u=>u.user===user);
+      if(!target){alert('用户名不存在');return}
+      const hp = await hashPassword(pw);
+      if(hp !== target.hash){alert('密码错误');return}
+      setCurrent(user); refreshUserUI(); alert('登录成功'); authModal.style.display='none';
+    });
+
+    logoutBtn.addEventListener('click', ()=>{setCurrent('');refreshUserUI();alert('已登出');});
+
+    /* 简单工具 */
+    function escapeHtml(s){ return (s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // 页面首次加载：如果 localStorage 有照片可以选择默认显示第一个地点
+    (function initialLoad(){
+      refreshUserUI();
+      // 显示图书馆作为默认
+      loadAndShowPhotos('library');
+    })();
+
+  </script>
+</body>
+</html>
