@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Prelude of the Abyss</title>
+<style>
+  :root{
+    --accent:#d4a05b;
+    --muted:#9aa0a6;
+    --bg-dark:#07060a;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#040405 0%, #0b0b0d 100%);font-family:Inter, "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC", "Noto Serif SC";color:#eef0f2;}
+  .stage{position:relative;min-height:100vh;display:flex;align-items:flex-end;justify-content:center;padding-bottom:38px;overflow:hidden}
+  /* subtle rain/blur background (CSS only; main ambience is WebAudio) */
+  .bg {
+    position:absolute;inset:0;background:
+      radial-gradient(60% 40% at 10% 20%, rgba(184,107,74,0.04), transparent 8%),
+      linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.6));
+    z-index:0;
+  }
+  /* silhouettes / background image placeholder */
+  .scene-art{position:absolute;inset:0;background-image:url('images/act1.png');background-size:cover;background-position:center;filter:grayscale(.25) contrast(.7) brightness(.45) blur(0.6px);transform:scale(1.03);z-index:0}
+  .vignette{position:absolute;inset:0;background:radial-gradient(60% 40% at 50% 30%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 60%);z-index:1}
+
+  /* UI top */
+  .ui-top{position:absolute;right:22px;top:18px;z-index:12;display:flex;gap:8px;align-items:center}
+  .btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer}
+  .btn:hover{color:#fff}
+
+  /* Dialogue container (Genshin-like) */
+  .dialogue-wrap{position:relative;z-index:16;width:min(1200px,96%);max-width:1200px;pointer-events:none}
+  .dialogue{
+    pointer-events:auto;display:flex;gap:18px;align-items:flex-end;
+    background:linear-gradient(180deg, rgba(6,6,8,0.55), rgba(8,8,10,0.72));
+    border-radius:18px;padding:16px 18px;border:1px solid rgba(255,255,255,0.03);
+    backdrop-filter: blur(6px) saturate(.9);
+    box-shadow:0 18px 40px rgba(0,0,0,0.7);
+  }
+  .portrait{width:220px;height:240px;flex:0 0 220px;display:flex;align-items:flex-end;justify-content:center;position:relative}
+  .portrait .art{width:200px;height:200px;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  .portrait.hidden{opacity:0.06;transform:translateY(6px) scale(.98);filter:grayscale(.7);transition:all .45s}
+  .portrait.show{opacity:1;transform:translateY(0) scale(1);filter:none;transition:all .45s}
+
+  .dialogue-center{flex:1;display:flex;flex-direction:column;gap:8px;padding:6px 0;min-height:120px}
+  .nameplate{display:flex;align-items:center;gap:12px;padding:6px 12px;border-radius:999px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);font-weight:700;color:var(--accent);min-width:160px}
+  .nameplate .voice{width:26px;height:26px;border-radius:8px;background:rgba(0,0,0,0.24);display:inline-flex;align-items:center;justify-content:center;margin-left:6px;border:1px solid rgba(255,255,255,0.02)}
+  .text-box{background:linear-gradient(180deg, rgba(0,0,0,0.06), rgba(255,255,255,0.01));border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.02);min-height:80px;color:#f6f7f8;line-height:1.6;font-size:16px;box-shadow:0 6px 18px rgba(0,0,0,0.5) inset}
+  .dialog-text{white-space:pre-wrap;min-height:64px}
+
+  /* choices above text like Genshin */
+  .choices{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .choice{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:8px 14px;border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:700}
+  .choice:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,0.45)}
+
+  /* bottom hint */
+  .hint{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;color:var(--muted);font-size:13px;z-index:16}
+
+  /* side panel for inventory/log */
+  .side-panel{position:absolute;left:18px;top:18px;width:300px;z-index:12;color:var(--muted)}
+  .panel{background:rgba(0,0,0,0.35);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.03);backdrop-filter:blur(4px)}
+  .panel h4{color:var(--accent);margin-bottom:8px}
+  .inv-item{font-size:14px;margin-bottom:6px;color:#e8e8e8}
+
+  /* responsive */
+  @media (max-width:900px){
+    .portrait{display:none}.dialogue{padding:12px}.side-panel{display:none}
+  }
+  #bg{
+  position:fixed;
+  inset:0;
+  background:url('images/act1.png') center/cover no-repeat;
+  z-index:-1;
+}
+
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="bg"></div>
+    <div class="scene-art" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <!-- top-right controls -->
+    <div class="ui-top">
+      <div class="btn" id="audioToggle">播放氛围</div>
+      <div class="btn" id="sfxToggle">音效：开</div>
+      <div class="btn" id="restartBtn">重置剧情</div>
+    </div>
+
+    <!-- left side panels -->
+    <div class="side-panel" id="sidePanel" aria-hidden="false">
+      <div class="panel">
+        <h4>角色 · 信息</h4>
+        <div>主角：<strong>罗迪翁</strong></div>
+        <div>时间：1970s 夜晚</div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="panel" id="logPanel">
+        <h4>日志 / 线索</h4>
+        <div id="logList"><div style="color:var(--muted)">无</div></div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="panel" id="invPanel">
+        <h4>物品栏</h4>
+        <div id="invList"><div style="color:var(--muted)">空</div></div>
+      </div>
+    </div>
+
+    <!-- Dialogue UI -->
+    <div class="dialogue-wrap" role="application" aria-label="对话界面">
+      <div class="dialogue" id="dialogueRoot">
+        <!-- left portrait -->
+        <div class="portrait show" id="leftPortrait">
+          <div class="art" id="leftArt">
+            <!-- inline SVG placeholder (Rodion) -->
+            <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+              <rect width="400" height="400" fill="#0a0a0c"/>
+              <g fill="#caa07a"><ellipse cx="200" cy="140" rx="78" ry="86"/></g>
+              <g fill="#0b0b0b"><rect x="140" y="260" width="120" height="36" rx="8"/></g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- center text -->
+        <div class="dialogue-center">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="nameplate" id="nameplate">罗迪翁
+              <div class="voice" id="voiceBtn" title="播放/停止配音" style="display:inline-flex;margin-left:8px"></div>
+            </div>
+            <div style="color:var(--muted);font-size:13px">空格/回车 或 点击选择推进</div>
+          </div>
+
+          <div class="text-box">
+            <div class="dialog-text" id="dialogText"></div>
+            <div class="choices" id="choicesRow" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- right portrait -->
+        <div class="portrait hidden" id="rightPortrait">
+          <div class="art" id="rightArt">
+            <!-- inline SVG placeholder (Virgil) -->
+            <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+              <rect width="400" height="400" fill="#0b0b0d"/>
+              <g fill="#9aa0a6"><path d="M200 80c40 0 72 36 72 80s-32 80-72 80-72-36-72-80 32-80 72-80z"/></g>
+              <g fill="#0b0b0b"><rect x="150" y="270" width="100" height="36" rx="8"/></g>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="hint">提示：按 空格 或 点击非按钮区域推进（第一次点击将启动氛围音）</div>
+  </div>
+
+<script>
+/* -----------------------
+  Dialogue engine + chapter content
+   - WebAudio synthesized ambience & SFX
+   - Scenes with parts, choices, effects (give clue/item)
+   - Inventory & log updates displayed in side panel
+   - Controls: audioToggle, sfxToggle, restart
+   - Modified: dialogue will NOT auto-play; each mouse click or Space advances ONE line
+------------------------*/
+
+///// WebAudio: ambient rain + drone + SFX (pure JS synthesis) /////
+let audioCtx = null;
+let masterGain, ambienceGain, sfxGain;
+let ambienceNodes = {};
+let sfxEnabled = true;
+let ambiencePlaying = false;
+let audioInitialized = false;
+
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.9; masterGain.connect(audioCtx.destination);
+  ambienceGain = audioCtx.createGain(); ambienceGain.gain.value = 0.45; ambienceGain.connect(masterGain); // overall quieter
+  sfxGain = audioCtx.createGain(); sfxGain.gain.value = 0.9; sfxGain.connect(masterGain);
+
+  // create rain (pink-ish noise shaped to feel like light rain)
+  const bufferSize = 2 * audioCtx.sampleRate;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  // smaller amplitude for "淅淅沥沥"
+  for (let i = 0; i < bufferSize; i++) output[i] = (Math.random()*2-1) * 0.12;
+
+  const noiseSource = audioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+
+  // shape noise with bandpass then high-shelf to emphasize higher frequencies for light rain
+  const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 0.9;
+  const hs = audioCtx.createBiquadFilter(); hs.type = 'highshelf'; hs.frequency.value = 3000; hs.gain.value = 3;
+
+  noiseSource.connect(bp).connect(hs).connect(ambienceGain);
+  ambienceNodes.noiseSource = noiseSource;
+  ambienceNodes.noiseBP = bp;
+  ambienceNodes.noiseHS = hs;
+
+  // low drone (sine oscillator) — very subtle
+  const drone = audioCtx.createOscillator(); drone.type='sine'; drone.frequency.value = 50; // low
+  const droneGain = audioCtx.createGain(); droneGain.gain.value = 0.0; // fade-in later if desired
+  drone.connect(droneGain).connect(ambienceGain);
+  ambienceNodes.drone = drone; ambienceNodes.droneGain = droneGain;
+
+  // subtle modulation LFO for drone
+  const lfo = audioCtx.createOscillator(); lfo.type='sine'; lfo.frequency.value = 0.12;
+  const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 6;
+  lfo.connect(lfoGain);
+  lfoGain.connect(drone.frequency);
+
+  ambienceNodes.lfo = lfo; ambienceNodes.lfoGain = lfoGain;
+
+  // start sources (will be audible only when gain raised)
+  noiseSource.start(0);
+  drone.start(0);
+  lfo.start(0);
+  audioInitialized = true;
+}
+
+function startAmbience(){
+  if(!audioCtx) initAudio();
+  if(ambiencePlaying) return;
+  audioCtx.resume().then(()=>{
+    // gentle fade-in for noise
+    ambienceGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    ambienceGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    ambienceGain.gain.linearRampToValueAtTime(0.45, audioCtx.currentTime + 1.5);
+    // subtle drone fade-in
+    ambienceNodes.droneGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    ambienceNodes.droneGain.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 2.0);
+    ambiencePlaying = true;
+    document.getElementById('audioToggle').textContent = '停止氛围';
+  });
+}
+
+function stopAmbience(){
+  if(!audioCtx) return;
+  ambienceNodes.droneGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  ambienceNodes.droneGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.5);
+  ambienceGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  ambienceGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.8);
+  ambiencePlaying = false;
+  document.getElementById('audioToggle').textContent = '播放氛围';
+}
+
+// SFX generator helpers
+function playClick(){
+  if(!audioInitialized || !sfxEnabled) return;
+  const o = audioCtx.createOscillator(); o.type='square'; o.frequency.value = 900;
+  const g = audioCtx.createGain(); g.gain.value = 0.0001;
+  o.connect(g);
+  g.connect(sfxGain);
+  g.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+  o.start(audioCtx.currentTime);
+  o.stop(audioCtx.currentTime + 0.2);
+}
+
+function playDoorCreak(){
+  if(!audioInitialized || !sfxEnabled) return;
+  const bufferSize = 0.5 * audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 800;
+  const g = audioCtx.createGain(); g.gain.value = 0.12;
+  src.connect(filt).connect(g).connect(sfxGain);
+  src.start();
+}
+
+function playThunder(){
+  if(!audioInitialized || !sfxEnabled) return;
+  const bufferSize = 2 * audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) d[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const g = audioCtx.createGain(); g.gain.value = 0.0;
+  const lp = audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 800;
+  src.connect(lp).connect(g).connect(sfxGain);
+  g.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 2.8);
+  src.start();
+}
+
+function playSiren(){
+  if(!audioInitialized || !sfxEnabled) return;
+  const o = audioCtx.createOscillator(); o.type='sine';
+  const g = audioCtx.createGain(); g.gain.value = 0.0;
+  o.connect(g).connect(sfxGain);
+  o.frequency.setValueAtTime(400, audioCtx.currentTime);
+  o.frequency.linearRampToValueAtTime(700, audioCtx.currentTime + 0.5);
+  g.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
+  o.start(audioCtx.currentTime);
+  o.stop(audioCtx.currentTime + 1.6);
+}
+
+///// End WebAudio section /////
+
+
+///// Dialogue engine & chapter data (unchanged content, same scenes) /////
+const LEFT_PORTRAIT = document.getElementById('leftPortrait');
+const RIGHT_PORTRAIT = document.getElementById('rightPortrait');
+const NAMEPLATE = document.getElementById('nameplate');
+const DIALOG_TEXT = document.getElementById('dialogText');
+const CHOICES_ROW = document.getElementById('choicesRow');
+const LOG_LIST = document.getElementById('logList');
+const INV_LIST = document.getElementById('invList');
+
+let state = { inventory: [], log: [] };
+
+function addLog(text){ state.log.push(text); renderLog(); }
+function giveItem(name){ if(!state.inventory.includes(name)) { state.inventory.push(name); renderInv(); addLog('获得：'+name); } }
+function renderLog(){ if(state.log.length===0) LOG_LIST.innerHTML = '<div style="color:var(--muted)">无</div>'; else LOG_LIST.innerHTML = state.log.map(s=>'<div style="margin-bottom:6px">'+s+'</div>').join(''); }
+function renderInv(){ if(state.inventory.length===0) INV_LIST.innerHTML = '<div style="color:var(--muted)">空</div>'; else INV_LIST.innerHTML = state.inventory.map(i=>'<div class="inv-item">'+i+'</div>').join(''); }
+
+// typewriter
+let typing=false;
+let skipTyping=false;
+function typeWrite(text, cb){
+  typing = true; DIALOG_TEXT.textContent = '';
+  let i=0;
+  const speed = 18;
+  const id = setInterval(()=>{
+    if(skipTyping){ DIALOG_TEXT.textContent = text; clearInterval(id); typing=false; skipTyping=false; cb && cb(); return; }
+    DIALOG_TEXT.textContent += text[i] || '';
+    i++;
+    if(i>text.length){ clearInterval(id); typing=false; cb && cb(); }
+  }, speed);
+}
+
+// Portrait helpers (show/hide)
+function showLeft(){ LEFT_PORTRAIT.classList.add('show'); LEFT_PORTRAIT.classList.remove('hidden'); }
+function hideLeft(){ LEFT_PORTRAIT.classList.add('hidden'); }
+function showRight(){ RIGHT_PORTRAIT.classList.add('show'); RIGHT_PORTRAIT.classList.remove('hidden'); }
+function hideRight(){ RIGHT_PORTRAIT.classList.add('hidden'); }
+
+/* -----------------
+  CHAPTER data (your original content)
+  Each scene contains parts: {speaker,side,text,action?} and choices: [{text,next,action?}]
+------------------*/
+const CHAPTER = {
+  start: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'……又是这样的夜晚。雨声、酒瓶、还有……我的噩梦。'},
+      {speaker:'罗迪翁',side:'left',text:'手机号没信号，窗外的街道像被洗过。'},
+      {speaker:'旁白',side:'center',text:'突然，门铃响了。没有人按门，但门虚掩着——冷风夹着雨滴。'}
+    ],
+    choices:[
+      {text:'起身去开门',next:'meetVirgil',action:()=>addLog('向门口走去。')},
+      {text:'装作没听见（继续喝酒）',next:'ignore',action:()=>addLog('选择回避。')}
+    ]
+  },
+
+  meetVirgil: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'门……谁？（心想：半夜来访谁会抬头）'},
+      {speaker:'维吉尔',side:'right',text:'别紧张，罗迪翁。我只是个引导者。',action:()=>playDoorCreak()},
+      {speaker:'罗迪翁',side:'left',text:'引导者？——你凭什么知道我的名字？'}
+    ],
+    choices:[
+      {text:'问他从何而来',next:'virgilExplain'},
+      {text:'让他进来',next:'letIn',action:()=>addLog('允许维吉尔进屋')}
+    ]
+  },
+
+  virgilExplain: {
+    parts:[
+      {speaker:'维吉尔',side:'right',text:'过去并非真正消失，它只是躲在阴影里，等你愿意面对。'},
+      {speaker:'维吉尔',side:'right',text:'我来是要拉你一把——当然，代价你稍后会知道。'}
+    ],
+    choices:[
+      {text:'拒绝他的帮助',next:'refuseHelp'},
+      {text:'试探性接受',next:'letIn',action:()=>addLog('试探性接受维吉尔')}
+    ]
+  },
+
+  letIn: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你让门开了。维吉尔披着亲切的微笑进门，像个喝醉夜里最不该出现的朋友。'},
+      {speaker:'维吉尔',side:'right',text:'谢谢。我这就不多停留。只是想给你最后一次机会——去看看窗外的那条小巷。'}
+    ],
+    choices:[
+      {text:'去窗边看小巷',next:'alleyLook'},
+      {text:'警惕地关门并锁上',next:'lockDoor'}
+    ]
+  },
+
+  refuseHelp: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'别自作多情。我受够了“机会”。'},
+      {speaker:'维吉尔',side:'right',text:'哀伤会这样说，但命运会用别的方式敲门。'}, 
+      {speaker:'旁白',side:'center',text:'维吉尔在门口留下一张折得整齐的名片，上面只有一句话：——“有些真相比忘却更危险。”'}
+    ],
+    choices:[
+      {text:'撕掉名片',next:'ripCard',action:()=>addLog('撕毁名片（冲动）')},
+      {text:'收下名片',next:'keepCard',action:()=>{ giveItem('折叠的名片'); addLog('保存名片')}}
+    ]
+  },
+
+  ripCard: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'我不需要你的把戏。'},
+      {speaker:'旁白',side:'center',text:'你把名片揉成团扔进垃圾桶。雨声给了你短暂的安慰，但远处的警笛愈发清晰。'}
+    ],
+    choices:[
+      {text:'披上外衣出门查看',next:'streetScene',action:()=>addLog('走向街道')},
+      {text:'回到炉边等待',next:'ignore',action:()=>addLog('回到室内（等待）')}
+    ]
+  },
+
+  keepCard: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'……是谁在玩弄我？'},
+      {speaker:'旁白',side:'center',text:'你把名片存进口袋。纸上写着一个地点：Pier 17，一个靠近旧码头的仓库区。'}
+    ],
+    choices:[
+      {text:'去Pier 17查看',next:'pier17',action:()=>addLog('决定前往 Pier 17')},
+      {text:'暂时不去',next:'ignore'}
+    ]
+  },
+
+  alleyLook: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你靠近窗边，透过雨帘看到小巷一角有人影，急促的动作、挣扎的光影，随即消失在远处的霓虹里。'},
+      {speaker:'罗迪翁',side:'left',text:'那是什么？有人……出事了吗？'}
+    ],
+    choices:[
+      {text:'下楼查看',next:'streetScene',action:()=>addLog('下楼查看小巷')},
+      {text:'不去（电话报警）',next:'callPolice',action:()=>addLog('拨打报警电话')}
+    ]
+  },
+
+  lockDoor: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'我不需要陌生人进来。'},
+      {speaker:'旁白',side:'center',text:'你把门锁上。维吉尔拍了拍门，笑了一笑，消失在雨夜中。很快，窗外传来警笛声，打断了你的呼吸。'}
+    ],
+    choices:[
+      {text:'探出窗外看',next:'alleyLook'},
+      {text:'等待警察到来',next:'waitForCops',action:()=>addLog('等待警方') }
+    ]
+  },
+
+  callPolice: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你拨通了报警电话，却因为醉态与不清的地址被转接多次。电话那端传来一阵忙乱的声音——好像是真的凶案现场。'},
+      {speaker:'旁白',side:'center',text:'不久，门外响起急促的敲门声——但这次是警方。'}
+    ],
+    choices:[
+      {text:'开门让警方进入',next:'policeEnter'},
+      {text:'观察并伪装睡着',next:'hide',action:()=>addLog('欲图躲避警方') }
+    ]
+  },
+
+  policeEnter: {
+    parts:[
+      {speaker:'警员',side:'right',text:'先生，我们接报在你楼下发现一名女性遇害，请问你昨夜有可疑来访吗？'},
+      {speaker:'罗迪翁',side:'left',text:'我……有人来过，但我不确定。'},
+      {speaker:'旁白',side:'center',text:'警员递来一张与那名遇害女性同款的照片——你隐约想起在街角看见过类似的身影。'}
+    ],
+    choices:[
+      {text:'描述你所见',next:'describeScene',action:()=>addLog('向警方陈述目击')},
+      {text:'保持沉默',next:'staySilent',action:()=>addLog('保持沉默') }
+    ]
+  },
+
+  streetScene: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'街道冷得像刀。你来到小巷，发现一片混乱：血迹、翻倒的纸箱、以及一串离去的脚印。'},
+      {speaker:'旁白',side:'center',text:'在雨水与油污中，你发现了——一只手套与一枚带血的铜扣。'}
+    ],
+    choices:[
+      {text:'捡起手套',next:'takeGlove',action:()=>{ giveItem('血迹手套'); playClick(); }},
+      {text:'沿着脚印追踪',next:'followTracks',action:()=>addLog('沿脚印追踪')}
+    ]
+  },
+
+  takeGlove: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'这手套……像是有人匆忙留下的。'},
+      {speaker:'旁白',side:'center',text:'你把手套放进外套口袋。它湿冷，带着一股难闻的腥味。'}
+    ],
+    choices:[
+      {text:'回到公寓',next:'backHome',action:()=>addLog('带着线索回到公寓')},
+      {text:'继续追踪',next:'followTracks'}
+    ]
+  },
+
+  followTracks: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'脚印引你来到一座老旧仓库，门半开，里面黑暗且弥漫着血腥味。'},
+      {speaker:'维吉尔',side:'right',text:'看来你找到了正确的门。',action:()=>playThunder()}
+    ],
+    choices:[
+      {text:'悄悄靠近，找线索',next:'warehouseInvest'},
+      {text:'撤回并报警',next:'callPolice',action:()=>addLog('准备报警')}
+    ]
+  },
+
+  warehouseInvest: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你从暗处窥见：仓库内有人影在整理东西，旁边的桌上放着一张照片，照片上的女人正是被报案的受害者。'},
+      {speaker:'旁白',side:'center',text:'你掏出戒指手套的口袋，发现血迹扩散，仿佛证据正在说话。'}
+    ],
+    choices:[
+      {text:'偷偷拍照（作为证据）',next:'snapPhoto',action:()=>{ giveItem('仓库照片'); playClick(); }},
+      {text:'直接进入 confront',next:'confront',action:()=>addLog('选择直接对峙')}
+    ]
+  },
+
+  snapPhoto: {
+    parts:[
+      {speaker:'罗迪翁',side:'left',text:'这张照片……我记得她在酒吧附近出现过。'},
+      {speaker:'旁白',side:'center',text:'你把照片放进手机（模拟），心里一阵凌乱。'}
+    ],
+    choices:[
+      {text:'回到公寓整理线索',next:'backHome',action:()=>addLog('返回公寓整理线索')},
+      {text:'继续观察',next:'warehouseObserve'}
+    ]
+  },
+
+  backHome: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'回到公寓你看到门上有新的划痕。桌上的那杯未喝完的威士忌，不知何时凉了。'},
+      {speaker:'维吉尔',side:'right',text:'你忙碌地寻找真相，疲惫却会在黄昏吞噬你。需要帮助吗？'}
+    ],
+    choices:[
+      {text:'接受帮助（交换信息）',next:'dealWithVirgil',action:()=>addLog('接受维吉尔的“帮助”')},
+      {text:'拒绝并独自调查',next:'soloInvestigate',action:()=>addLog('拒绝维吉尔')},
+    ]
+  },
+
+  warehouseObserve: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你发现其中一人拿着一封信，信封上写着“E.D.”的字样。'},
+      {speaker:'旁白',side:'center',text:'这可能是通往更大网络的线索。'}
+    ],
+    choices:[
+      {text:'拿下信封，带走证据',next:'grabEnvelope',action:()=>{ giveItem('署名信封（E.D.）'); playClick(); }},
+      {text:'暂时不动，等待机会',next:'confront'}
+    ]
+  },
+
+  confront: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你冲入仓库。黑暗中，一名人影抽身而退——你看到熟悉的轮廓：是维吉尔。'},
+      {speaker:'维吉尔',side:'right',text:'我说过，命运会敲门——有些门打开的方式不太优雅。'},
+      {speaker:'罗迪翁',side:'left',text:'你在撒谎。你知道这些事——告诉我，维吉尔，你是谁？'}
+    ],
+    choices:[
+      {text:'逼问真相',next:'virgilTruth'},
+      {text:'抓住他，拷问',next:'grabVirgil',action:()=>addLog('尝试制服维吉尔')}
+    ]
+  },
+
+  virgilTruth: {
+    parts:[
+      {speaker:'维吉尔',side:'right',text:'名字不重要，罗迪翁。重要的是你是否愿意用代价换取记忆。'},
+      {speaker:'维吉尔',side:'right',text:'帮我一个忙？把那仇人的名字带给我。'}
+    ],
+    choices:[
+      {text:'答应（隐含代价）',next:'dealWithVirgil',action:()=>addLog('与维吉尔交易')},
+      {text:'愤怒拒绝',next:'fightVirgil',action:()=>addLog('拒绝并战斗')}
+    ]
+  },
+
+  dealWithVirgil: {
+    parts:[
+      {speaker:'维吉尔',side:'right',text:'很好。给我一件属于他们的物品，作为交换，我会给你一段关于你妻子的记忆。'},
+      {speaker:'旁白',side:'center',text:'你感觉到自己在边缘。记忆的裂缝摇晃，诱惑近在咫尺。'}
+    ],
+    choices:[
+      {text:'交出证据（交由维吉尔）',next:'sacrifice',action:()=>{ if(state.inventory.length>0){ state.inventory.pop(); renderInv(); addLog('交出一件物品作为代价'); } else addLog('没有可交付的物品'); }},
+      {text:'不交（保留证据）',next:'keepEvidence',action:()=>addLog('拒绝交出证据')}
+    ]
+  },
+
+  sacrifice: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'维吉尔把你的物品放在掌心，低语。你的眼前一片模糊，短暂的画面掠过——你看到你妻子的背影，模糊却温暖。'},
+      {speaker:'罗迪翁',side:'left',text:'……那是我妻子。'}
+    ],
+    choices:[
+      {text:'继续追查（结尾）',next:'chapterEnd'},
+      {text:'沉迷回忆（放弃调查）',next:'giveUp',action:()=>addLog('被记忆吞噬')}
+    ]
+  },
+
+  keepEvidence: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你拒绝交出证据。维吉尔收敛笑容：这只是开始，他轻声离开。'},
+      {speaker:'旁白',side:'center',text:'你手里的线索更加沉重，谜团远未揭开。'}
+    ],
+    choices:[
+      {text:'继续追查（结尾）',next:'chapterEnd'}
+    ]
+  },
+
+  fightVirgil: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你冲上去扑向维吉尔，但他的身形像烟雾一般消散。你只听到冷冷一笑从阴影里传来。'},
+      {speaker:'旁白',side:'center',text:'仓库里留下的只有混乱与一张沾血的纸条，写着：\"不要追太深。\"'}
+    ],
+    choices:[
+      {text:'追查线索（结尾）',next:'chapterEnd'}
+    ]
+  },
+
+  chapterEnd: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'夜渐亮，警灯在远处晃动。你站在真相与记忆交界的岔路口。第一章结束，新的追查才刚刚开始。'},
+    ],
+    choices:[
+      {text:'重新开始',next:'start'},
+      {text:'导出日志（控制台）',next:'export'}
+    ]
+  },
+
+  ignore: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你选择继续喝酒，雨声成为了你短暂的慰藉。然而，真实不会因回避而消失。楼下的慌乱与警笛，正逐渐扩展成更大的漩涡。'},
+    ],
+    choices:[
+      {text:'站起来去看',next:'streetScene'},
+      {text:'继续待着（结束）',next:'chapterEnd'}
+    ]
+  },
+
+  hide: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'你躲在屋内，警方进去调查了楼下，但很快离开。你感觉像个失败者——直到口袋里那张名片像刀刃一样刺痛你的记忆。'},
+    ],
+    choices:[
+      {text:'决定自己去查',next:'streetScene'},
+      {text:'放弃（结束）',next:'chapterEnd'}
+    ]
+  },
+
+  export: {
+    parts:[
+      {speaker:'旁白',side:'center',text:'（为演示，日志将输出到浏览器控制台）'}
+    ],
+    choices:[
+      {text:'返回',next:'start',action:()=>{ console.log('LOGS:', state.log); console.log('INVENTORY:', state.inventory); addLog('已导出日志（控制台）'); }},
+    ]
+  }
+};
+
+/* -----------------
+  Revised presentation logic:
+  - presentScene sets the scene and shows the first part
+  - showPart displays the current part (typewriter) and waits for user click/space to call nextPart()
+  - nextPart handles skipping typing or moving to next part; when parts exhausted show choices
+------------------*/
+
+let currentScene = null;
+let currentParts = [];
+let currentPartIndex = 0;
+let sceneStarted = false; // whether user initiated start (first gesture)
+let globalStarted = false; // to track first user gesture (start ambience etc.)
+
+async function presentScene(key){
+  const scene = CHAPTER[key];
+  if(!scene) { console.warn('Scene not found', key); return; }
+  currentScene = key;
+  currentParts = scene.parts || [];
+  currentPartIndex = 0;
+  CHOICES_ROW.style.display = 'none';
+  CHOICES_ROW.innerHTML = '';
+  // immediately show the first part (but do NOT auto-advance further)
+  await showPart();
+}
+
+async function showPart(){
+  if(!currentParts || currentPartIndex >= currentParts.length){
+    // show choices or nothing
+    const scene = CHAPTER[currentScene];
+    if(scene && scene.choices && scene.choices.length>0){
+      CHOICES_ROW.style.display = 'flex';
+      CHOICES_ROW.innerHTML = '';
+      scene.choices.forEach((ch, idx)=>{
+        const btn = document.createElement('div'); btn.className='choice'; btn.textContent = ch.text;
+        btn.addEventListener('click', ()=>{
+          playClick();
+          if(ch.action) ch.action();
+          // present next scene when clicked
+          presentScene(ch.next);
+        });
+        CHOICES_ROW.appendChild(btn);
+      });
+    } else {
+      CHOICES_ROW.style.display = 'none';
+    }
+    return;
+  }
+
+  const part = currentParts[currentPartIndex];
+  // portrait & name
+  if(part.side === 'left'){ showLeft(); hideRight(); NAMEPLATE.innerText = part.speaker; }
+  else if(part.side === 'right'){ showRight(); hideLeft(); NAMEPLATE.innerText = part.speaker; }
+  else { hideLeft(); hideRight(); NAMEPLATE.innerText = ''; }
+
+  // action triggers
+  if(part.action) part.action();
+
+  // typewrite (await completion OR wait for skip)
+  await new Promise(res => typeWrite(part.text, res));
+  // after type completes, stay waiting for user click to move to next part
+}
+
+function nextPart(){
+  // if currently typing, skip to finish
+  if(typing){
+    skipTyping = true;
+    return;
+  }
+  // if choices visible, do nothing (wait for choice)
+  if(CHOICES_ROW.style.display !== 'none' && CHOICES_ROW.children.length>0) return;
+
+  // advance index and show next part or choices
+  currentPartIndex++;
+  if(currentPartIndex < currentParts.length){
+    showPart();
+  } else {
+    // parts ended -> show choices
+    const scene = CHAPTER[currentScene];
+    if(scene && scene.choices && scene.choices.length>0){
+      CHOICES_ROW.style.display = 'flex';
+      CHOICES_ROW.innerHTML = '';
+      scene.choices.forEach((ch, idx)=>{
+        const btn = document.createElement('div'); btn.className='choice'; btn.textContent = ch.text;
+        btn.addEventListener('click', ()=>{
+          playClick();
+          if(ch.action) ch.action();
+          presentScene(ch.next);
+        });
+        CHOICES_ROW.appendChild(btn);
+      });
+    } else {
+      CHOICES_ROW.style.display = 'none';
+    }
+  }
+}
+
+/* Controls / interactions */
+// overall click handler — first gesture starts ambience + starts scene if not yet started
+document.body.addEventListener('click', (e)=>{
+  // if click on a choice, let its handler manage it
+  if(e.target.closest('.choice')) return;
+
+  // initialize audio (audioContext) on first user gesture
+  if(!globalStarted){
+    initAudio();
+    startAmbience(); // start ambience on first gesture
+    globalStarted = true;
+  }
+
+  // if typing -> skip
+  if(typing){ skipTyping = true; return; }
+
+  // if no scene started yet, start first scene
+  if(!sceneStarted){
+    sceneStarted = true;
+    presentScene('start');
+    return;
+  }
+
+  // otherwise, advance one part
+  nextPart();
+});
+
+// keyboard handler: space/enter to advance; number keys for choices
+document.addEventListener('keydown', (e)=>{
+  if(e.code === 'Space' || e.key === 'Enter'){
+    e.preventDefault();
+    // if not started, treat as first gesture
+    if(!globalStarted){
+      initAudio();
+      startAmbience();
+      globalStarted = true;
+    }
+    if(!sceneStarted){
+      sceneStarted = true;
+      presentScene('start');
+      return;
+    }
+    // if typing -> skip, else advance
+    if(typing){ skipTyping = true; return; }
+    // if choices visible, do nothing (numbers will pick)
+    if(CHOICES_ROW.style.display !== 'none') return;
+    nextPart();
+  }
+
+  // number key quick-select choices (1-9)
+  if(/\d/.test(e.key)){
+    const n = parseInt(e.key,10) - 1;
+    if(CHOICES_ROW.children[n]) CHOICES_ROW.children[n].click();
+  }
+});
+
+//// Buttons
+document.getElementById('audioToggle').addEventListener('click', ()=>{
+  if(!audioInitialized) initAudio();
+  if(!ambiencePlaying){ startAmbience(); playThunder(); }
+  else { stopAmbience(); }
+});
+document.getElementById('sfxToggle').addEventListener('click', ()=>{
+  sfxEnabled = !sfxEnabled;
+  document.getElementById('sfxToggle').textContent = sfxEnabled ? '音效：开' : '音效：关';
+});
+document.getElementById('restartBtn').addEventListener('click', ()=>{
+  // reset state
+  state = {inventory:[],log:[]}; renderInv(); renderLog();
+  // reset flags
+  sceneStarted = false; currentScene = null; currentParts = []; currentPartIndex = 0;
+  CHOICES_ROW.style.display = 'none'; CHOICES_ROW.innerHTML = '';
+  document.getElementById('audioToggle').textContent='播放氛围';
+  if(ambiencePlaying) stopAmbience();
+  globalStarted = false;
+  // reset portraits & text
+  NAMEPLATE.innerText = '';
+  DIALOG_TEXT.textContent = '';
+});
+
+//// small helper to play SFX easily in actions
+function playSfx(name){ if(sfxEnabled) {
+  if(name==='click'){ playClick(); } else if(name==='door'){ playDoorCreak(); } else if(name==='thunder'){ playThunder(); } else if(name==='siren'){ playSiren(); } else playClick();
+} }
+
+//// initial render
+renderInv(); renderLog();
+// DO NOT auto-present or call present('start') here — wait for user click/space to begin.
+
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Dusky Souls</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <!-- 引入 Google Fonts 艺术字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            user-select: none; /* 禁止页面所有文字被选中 */
+        }
+        img {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+        }
+        /* 登录注册导航 */
+        .nav {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            font-family: Arial, sans-serif;
+            font-size: 20px;
+        }
+        .nav a {
+            color: #fff;
+            text-decoration: none;
+            margin-left: 20px;
+            padding: 8px 16px;
+            border: 1px solid #fff;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.4);
+            transition: all 0.3s;
+        }
+        .nav a:hover {
+            background: rgba(255,255,255,0.85);
+            color: #000;
+        }
+        /* 标题字体样式 */
+        h1 {
+            position: absolute;
+            top: 16%;
+            width: 100%;
+            text-align: center;
+            font-size: 120px;
+            font-family: 'UnifrakturCook', cursive;
+            margin: 0;
+        }
+        h1 span {
+            display: inline-block;
+            background: linear-gradient(180deg, #d4af37, #8b0000);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 
+                0 0 20px rgba(255, 140, 0, 0.7),
+                0 0 40px rgba(255, 69, 0, 0.9),
+                4px 4px 15px rgba(0, 0, 0, 0.8);
+            letter-spacing: 8px;
+            animation: glow 3s ease-in-out infinite;
+            cursor: default; /* 保持箭头光标 */
+        }
+        /* 呼吸发光动画 */
+        @keyframes glow {
+            0% {
+                text-shadow: 
+                    0 0 15px rgba(255, 140, 0, 0.5),
+                    0 0 30px rgba(255, 69, 0, 0.6),
+                    3px 3px 10px rgba(0, 0, 0, 0.7);
+                transform: scale(1);
+            }
+            50% {
+                text-shadow: 
+                    0 0 35px rgba(255, 215, 0, 1),
+                    0 0 70px rgba(255, 69, 0, 0.9),
+                    6px 6px 20px rgba(0, 0, 0, 1);
+                transform: scale(1.05);
+            }
+            100% {
+                text-shadow: 
+                    0 0 15px rgba(255, 140, 0, 0.5),
+                    0 0 30px rgba(255, 69, 0, 0.6),
+                    3px 3px 10px rgba(0, 0, 0, 0.7);
+                transform: scale(1);
+            }
+        }
+        .center {
+            position: absolute;
+            bottom: 15%;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        .btn {
+            padding: 18px 50px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            font-size: 26px;
+            font-family: Arial, sans-serif;
+            text-decoration: none;
+            border-radius: 15px;
+            border: 2px solid #fff;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.9);
+            color: #000;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景音乐 -->
+    <audio id="bgm" src="audio/首页.mp3" loop></audio>
+    <!-- ding 音效 -->
+    <audio id="ding-sound" src="audio/ding.mp3" preload="auto"></audio>
+
+    <div class="nav">
+        <a href="登录.html">登录  注册</a>
+    </div>
+    <h1><span>Dusky Souls</span></h1>
+    <img src="images/首页.jpg">
+    <div class="center">
+        <a href="plot/Prelude of the Abyss.html" class="btn">开始游戏</a>
+    </div>
+
+    <script>
+        // 背景音乐逻辑：第一次点击页面后开始播放（音量调低）
+        document.addEventListener("click", function () {
+            const bgm = document.getElementById("bgm");
+            bgm.volume = 0.6;
+            bgm.play().catch(err => console.log("BGM play blocked:", err));
+        }, { once: true });
+
+        // 悬停 & 点击提示音逻辑
+        const ding = document.getElementById("ding-sound");
+        ding.volume = 1.0;
+
+        document.querySelectorAll("a").forEach(link => {
+            link.addEventListener("mouseenter", () => {
+                ding.currentTime = 0;
+                ding.play();
+            });
+
+            link.addEventListener("click", (event) => {
+                event.preventDefault();
+                const url = link.getAttribute("href");
+
+                ding.currentTime = 0;
+                ding.play();
+
+                ding.onended = () => {
+                    if (url && url !== "#") {
+                        window.location.href = url;
+                    }
+                };
+            });
+        });
+
+        // 注册 PWA service worker
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("sw.js")
+                .then(() => console.log("Service Worker registered"))
+                .catch(err => console.log("SW registration failed:", err));
+        }
+    </script>
+</body>
+</html>
+ 
